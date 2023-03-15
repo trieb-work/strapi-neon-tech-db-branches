@@ -1,6 +1,6 @@
 {
   "name": "strapi-neon-tech-db-branches",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "This is the description of the plugin.",
   "strapi": {
     "name": "strapi-neon-tech-db-branches",
@@ -17,12 +17,13 @@
     "@strapi/typescript-utils": "^4.6.0",
     "typescript": "4.6.3"
   },
+  "homepage": "https://github.com/trieb-work/strapi-neon-tech-db-branches#readme",
   "author": {
-    "name": "A Strapi developer"
+    "name": "https://github.com/tilman"
   },
   "maintainers": [
     {
-      "name": "A Strapi developer"
+      "name": "https://github.com/tilman"
     }
   ],
   "engines": {
