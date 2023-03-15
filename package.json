@@ -1,6 +1,6 @@
 {
   "name": "strapi-neon-tech-db-branches",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "This is the description of the plugin.",
   "strapi": {
     "name": "strapi-neon-tech-db-branches",
@@ -8,10 +8,12 @@
     "kind": "plugin"
   },
   "dependencies": {
+    "@strapi/strapi": "^4.7.1",
     "git-branch": "^2.0.1",
     "git-repo-name": "^1.0.1",
     "multiselect-prompt": "^0.3.2",
-    "neon-sdk": "^1.1.1"
+    "neon-sdk": "^1.1.1",
+    "pg-connection-string": "^2.5.0"
   },
   "devDependencies": {
     "@strapi/typescript-utils": "^4.6.0",

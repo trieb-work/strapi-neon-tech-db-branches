@@ -2,6 +2,7 @@
   "extends": "@strapi/typescript-utils/tsconfigs/server",
 
   "compilerOptions": {
+    "lib": ["dom","es2022","es6"],
     "outDir": "dist",
     "rootDir": "."
   },

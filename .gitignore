@@ -1,4 +1,6 @@
 # Logs
+node_modules
+
 logs
 *.log
 npm-debug.log*
@@ -80,7 +82,6 @@ typings/
 
 # Nuxt.js build / generate output
 .nuxt
-dist
 
 # Gatsby files
 .cache/
