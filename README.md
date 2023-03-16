@@ -1,4 +1,4 @@
-# Strapi plugin strapi-neon-tech-db-branches
+# Strapi v4 plugin strapi-neon-tech-db-branches
 This plugin integrates neon.tech with Strapi. It does the following:
 - automatically inject the postgres connection string (host, port, username, password) using your current git branch or environment variables
 - create a new neon database branch for your current working git branch
