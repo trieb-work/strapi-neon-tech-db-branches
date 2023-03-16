@@ -1,10 +1,10 @@
 {
   "name": "strapi-neon-tech-db-branches",
   "version": "0.1.6",
-  "description": "This is the description of the plugin.",
+  "description": "Strapi plugin to integrate the neon.tech serverless Postgres DB with Strapi - including automatic use of the branching feature",
   "strapi": {
     "name": "strapi-neon-tech-db-branches",
-    "description": "Description of strapi-neon-tech-db-branches plugin",
+    "description": "Strapi plugin to integrate the neon.tech serverless Postgres DB with Strapi - including automatic use of the branching feature",
     "kind": "plugin"
   },
   "dependencies": {
