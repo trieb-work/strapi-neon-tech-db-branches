@@ -32,7 +32,6 @@ module.exports = {
   ...
   'strapi-neon-tech-db-branches': {
     enabled: true,
-    resolve: './src/plugins/strapi-neon-tech-db-branches',
     config: {
       neonApiKey: "09hx...0a8yjd", // get it from here: https://console.neon.tech/app/settings/api-keys
       neonProjectName: "strapi-project-xyz", // the neon project under wich your DB runs
