@@ -1,8 +1,9 @@
 # Strapi plugin strapi-neon-tech-db-branches
-This Plugin does create a neon.tech DB branch for your active git branch on strapi startup. 
-If you switch the git branch it will make sure to use or create the new branch in neon.tech as well.
+This plugin integrates neon.tech with Strapi. It does the following:
+- automatically inject the postgres connection string (host, port, username, password) using your current git branch or environment variables
+- create a new neon database branch for your current working git branch
 
-The parent branch will always be the main branch. Therefore this plugin follows the develop-preview-ship principle.
+The neon parent branch will always be the main branch. Therefore this plugin follows the develop-preview-ship principle.
 
 
 ## This plugin can be configured via Environment variables or via plugins.js config:
