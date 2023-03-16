@@ -2,8 +2,11 @@
 This plugin integrates neon.tech with Strapi. It does the following:
 - automatically inject the postgres connection string (host, port, username, password) using your current git branch or environment variables
 - create a new neon database branch for your current working git branch
+- the same database branch is used in development as well as in the preview deployment which eliminates copying and recreation of testing data
 
-The neon parent branch will always be the main branch. Therefore this plugin follows the develop-preview-ship principle.
+![isolated databases](https://user-images.githubusercontent.com/5111431/225722017-a5706fef-c9c9-4632-ae3d-75867e7971ea.svg)
+
+The neon parent branch will always be the main branch. Therefore this plugin follows the develop-preview-ship principle. This will make working with Strapi way more easy since therefore Strapi is always "seeded" with live data.
 
 ## Installation
 ```
