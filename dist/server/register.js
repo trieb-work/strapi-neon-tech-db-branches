@@ -6,13 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const neon_sdk_1 = require("neon-sdk");
 const git_branch_1 = __importDefault(require("git-branch"));
 const pg_connection_string_1 = require("pg-connection-string");
-const multiselect_prompt_1 = __importDefault(require("multiselect-prompt"));
+const prompts_1 = __importDefault(require("prompts"));
 let initBranch = "";
 let initStrapi = undefined;
 // Restart Server if git branch changes
 setInterval(async () => {
+    if (initBranch === "")
+        return;
     const currentBranch = await (0, git_branch_1.default)();
-    if (initBranch && initBranch !== currentBranch && initStrapi) {
+    if (initBranch !== currentBranch && initStrapi) {
         console.log("reload", typeof initStrapi);
         initStrapi.reload();
     }
@@ -58,13 +60,36 @@ exports.default = async ({ strapi }) => {
         branch = await neonClient.branch.createProjectBranch(project.id, createBranchConf).catch(async (err) => {
             var _a, _b, _c;
             if (((_a = err === null || err === void 0 ? void 0 : err.body) === null || _a === void 0 ? void 0 : _a.code) === "BRANCHES_LIMIT_EXCEEDED") {
-                const options = (_c = (_b = branches === null || branches === void 0 ? void 0 : branches.branches) === null || _b === void 0 ? void 0 : _b.filter((b) => b.name !== "main" && b.name !== "master")) === null || _c === void 0 ? void 0 : _c.map((b) => ({
+                const choices = (_c = (_b = branches === null || branches === void 0 ? void 0 : branches.branches) === null || _b === void 0 ? void 0 : _b.filter((b) => b.name !== "main" && b.name !== "master")) === null || _c === void 0 ? void 0 : _c.map((b) => ({
                     title: b.name,
                     value: b.id,
                 }));
-                const selection = await new Promise((res) => (0, multiselect_prompt_1.default)("Neon.tech branches limit exceeded. Should we delete unused branches?", options).on('submit', (items) => res(items)));
-                const selectedOptionsValues = selection.map((o, idx) => { var _a; return o.selected ? (_a = options === null || options === void 0 ? void 0 : options[idx]) === null || _a === void 0 ? void 0 : _a.value : undefined; }).filter((v) => !!v);
-                for (const branchId of selectedOptionsValues) {
+                // const selection = await new Promise<{value: string, selected: boolean}[]>(
+                //   (res) => prompt("Neon.tech branches limit exceeded. Should we delete unused branches?", 
+                //   options
+                // ).on('submit', (items) => res(items)));
+                // const prompt = new MultiSelect({
+                //   name: 'value',
+                //   message: "Neon.tech branches limit exceeded. Should we delete unused branches?",
+                //   limit: 10,
+                //   choices: options
+                // });
+                // const inquirer = await import("inquirer");
+                // const prompt = inquirer.createPromptModule();
+                // const selection = await prompt([{
+                //   "type": "checkbox",
+                //   "choices": options
+                // }])
+                console.warn("Neon.tech branches limit exceeded.");
+                const selection = await (0, prompts_1.default)([{
+                        type: 'multiselect',
+                        name: 'value',
+                        message: 'Should we delete unused branches',
+                        choices: choices,
+                        max: 10,
+                        hint: '- Space to select. Return to submit'
+                    }]);
+                for (const branchId of selection === null || selection === void 0 ? void 0 : selection.value) {
                     try {
                         await neonClient.branch.deleteProjectBranch(project.id, branchId);
                         await new Promise((res) => setTimeout(res, 2500)); // sleep few till branch delete operation is finished

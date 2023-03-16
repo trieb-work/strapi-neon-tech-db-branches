@@ -3,15 +3,16 @@ import { BranchCreateRequest, BranchesResponse, EndpointsResponse, NeonClient, P
 import { NeonTechDburlConfig } from './config';
 import getBranch from 'git-branch';
 import { parse } from 'pg-connection-string';
-import prompt from 'multiselect-prompt';
+import prompts from 'prompts';
 
 let initBranch = "";
 let initStrapi: Strapi | undefined = undefined;
 
 // Restart Server if git branch changes
 setInterval(async () => {
+  if(initBranch === "") return;
   const currentBranch = await getBranch();
-  if(initBranch && initBranch !== currentBranch && initStrapi){
+  if(initBranch !== currentBranch && initStrapi){
     console.log("reload", typeof initStrapi);
     initStrapi.reload();
   }
@@ -56,16 +57,40 @@ export default async ({ strapi }: { strapi: Strapi }) => {
     };
     branch = await neonClient.branch.createProjectBranch(project.id, createBranchConf).catch(async (err) => {
       if(err?.body?.code === "BRANCHES_LIMIT_EXCEEDED"){
-        const options = branches?.branches?.filter((b) => b.name !== "main" && b.name !== "master")?.map((b) => ({
+        const choices = branches?.branches?.filter((b) => b.name !== "main" && b.name !== "master")?.map((b) => ({
           title: b.name,
           value: b.id,
         }));
-        const selection = await new Promise<{value: string, selected: boolean}[]>(
-          (res) => prompt("Neon.tech branches limit exceeded. Should we delete unused branches?", 
-          options
-        ).on('submit', (items) => res(items)));
-        const selectedOptionsValues = selection.map((o, idx) => o.selected ? options?.[idx]?.value : undefined).filter((v) => !!v) as string[]
-        for(const branchId of selectedOptionsValues){
+        // const selection = await new Promise<{value: string, selected: boolean}[]>(
+        //   (res) => prompt("Neon.tech branches limit exceeded. Should we delete unused branches?", 
+        //   options
+        // ).on('submit', (items) => res(items)));
+
+        // const prompt = new MultiSelect({
+        //   name: 'value',
+        //   message: "Neon.tech branches limit exceeded. Should we delete unused branches?",
+        //   limit: 10,
+        //   choices: options
+        // });
+        // const inquirer = await import("inquirer");
+        // const prompt = inquirer.createPromptModule();
+        // const selection = await prompt([{
+        //   "type": "checkbox",
+        //   "choices": options
+        // }])
+
+        console.warn("Neon.tech branches limit exceeded.")
+
+        const selection = await prompts([{
+          type: 'multiselect',
+          name: 'value',
+          message: 'Should we delete unused branches',
+          choices: choices,
+          max: 10,
+          hint: '- Space to select. Return to submit'
+        }])
+
+        for(const branchId of selection?.value){
           try{
             await neonClient.branch.deleteProjectBranch(project.id, branchId);
             await new Promise((res) => setTimeout(res, 2_500)); // sleep few till branch delete operation is finished
