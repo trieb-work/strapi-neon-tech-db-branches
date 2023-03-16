@@ -6,6 +6,15 @@ This plugin integrates neon.tech with Strapi. It does the following:
 The neon parent branch will always be the main branch. Therefore this plugin follows the develop-preview-ship principle.
 
 
+## Install
+```
+npm i strapi-neon-tech-db-branches
+```
+```
+pnpm i strapi-neon-tech-db-branches
+```
+
+
 ## This plugin can be configured via Environment variables or via plugins.js config:
 
 ### Via Environment Variables:
