@@ -1,10 +1,10 @@
 {
   "name": "strapi-neon-tech-db-branches",
-  "version": "0.1.6",
-  "description": "This is the description of the plugin.",
+  "version": "0.1.7",
+  "description": "This Strapi Plugin integrates neon.tech Postgres DB with automatic git/db branch synchronization",
   "strapi": {
     "name": "strapi-neon-tech-db-branches",
-    "description": "Description of strapi-neon-tech-db-branches plugin",
+    "description": "Connect to a neon.tech Postgres DB with automatic DB branch creation (synced with git branch)",
     "kind": "plugin"
   },
   "dependencies": {
