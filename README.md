@@ -12,6 +12,8 @@ The neon parent branch will always be the main branch. Therefore this plugin fol
 
 ## Installation
 
+**The `neon-sdk` dependency requires at least node v18. Therefore this package also requires at least node v18**
+
 ```
 npm i strapi-neon-tech-db-branches
 ```

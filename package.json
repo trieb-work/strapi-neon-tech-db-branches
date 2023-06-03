@@ -43,12 +43,12 @@
     }
   ],
   "engines": {
-    "node": ">=16.x.x <=20.x.x",
+    "node": ">=18.x.x <=20.x.x",
     "npm": ">=6.0.0"
   },
   "scripts": {
-    "develop": "tsc -p tsconfig.server.json -w",
-    "build": "tsc -p tsconfig.server.json"
+    "dev": "tsc -p tsconfig.server.json -w",
+    "build": "rm -rf build && tsc -p tsconfig.server.json"
   },
   "license": "MIT"
 }
