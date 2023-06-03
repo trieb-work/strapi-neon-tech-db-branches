@@ -9,24 +9,30 @@ const pg_connection_string_1 = require("pg-connection-string");
 const prompts_1 = __importDefault(require("prompts"));
 let initBranch = "";
 let initStrapi = undefined;
-// Restart Server if git branch changes
-setInterval(async () => {
-    if (initBranch === "")
-        return;
+async function checkBranchChange() {
+    if (initBranch === "") {
+        await new Promise((r) => setTimeout(r, 1500));
+        await checkBranchChange();
+    }
     const currentBranch = await (0, git_branch_1.default)();
     if (initBranch !== currentBranch && initStrapi) {
-        console.log("reload", typeof initStrapi);
+        initBranch = "";
+        await createAndSetPostgresConfig();
+        await new Promise((r) => setTimeout(r, 500));
         initStrapi.reload();
+        await new Promise((r) => setTimeout(r, 5000));
     }
-}, 1500);
-exports.default = async ({ strapi }) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    await checkBranchChange();
+}
+checkBranchChange();
+async function createAndSetPostgresConfig() {
     var _a, _b, _c, _d, _e, _f, _g;
-    const config = strapi.config.get('plugin.strapi-neon-tech-db-branches');
-    initStrapi = strapi;
+    const config = strapi.config.get("plugin.strapi-neon-tech-db-branches");
     if (config.gitBranch) {
         console.warn(`Using fixed branch ${config.gitBranch} for neon DB`);
     }
-    const gitBranchName = config.gitBranch || await (0, git_branch_1.default)();
+    const gitBranchName = config.gitBranch || (await (0, git_branch_1.default)());
     if (!gitBranchName) {
         throw new Error("Could not get branch name");
     }
@@ -34,7 +40,7 @@ exports.default = async ({ strapi }) => {
     const neonClient = new neon_sdk_1.NeonClient({
         TOKEN: config.neonApiKey,
     });
-    const projects = await neonClient.project.listProjects();
+    const projects = (await neonClient.project.listProjects());
     let project;
     if (projects === null || projects === void 0 ? void 0 : projects.projects) {
         project = (_a = projects === null || projects === void 0 ? void 0 : projects.projects) === null || _a === void 0 ? void 0 : _a.find((p) => { var _a, _b; return ((_a = p.name) === null || _a === void 0 ? void 0 : _a.trim()) === ((_b = config.neonProjectName) === null || _b === void 0 ? void 0 : _b.trim()); });
@@ -42,7 +48,7 @@ exports.default = async ({ strapi }) => {
     if (!project) {
         throw new Error(`No Project found with this Name ${config.neonProjectName}`);
     }
-    const branches = await neonClient.project.listProjectBranches(project.id);
+    const branches = (await neonClient.branch.listProjectBranches(project.id));
     let branch;
     if (branches === null || branches === void 0 ? void 0 : branches.branches) {
         branch = (_b = branches === null || branches === void 0 ? void 0 : branches.branches) === null || _b === void 0 ? void 0 : _b.find((b) => { var _a; return ((_a = b.name) === null || _a === void 0 ? void 0 : _a.trim()) === (gitBranchName === null || gitBranchName === void 0 ? void 0 : gitBranchName.trim()); });
@@ -50,45 +56,35 @@ exports.default = async ({ strapi }) => {
     let dbConnectionUri = "";
     if (!branch) {
         const createBranchConf = {
-            "branch": {
-                "name": gitBranchName,
+            branch: {
+                name: gitBranchName,
             },
-            "endpoints": [{
-                    "type": "read_write",
-                }]
+            endpoints: [
+                {
+                    type: "read_write",
+                },
+            ],
         };
-        branch = await neonClient.branch.createProjectBranch(project.id, createBranchConf).catch(async (err) => {
+        branch = await neonClient.branch
+            .createProjectBranch(project.id, createBranchConf)
+            .catch(async (err) => {
             var _a, _b, _c;
             if (((_a = err === null || err === void 0 ? void 0 : err.body) === null || _a === void 0 ? void 0 : _a.code) === "BRANCHES_LIMIT_EXCEEDED") {
                 const choices = (_c = (_b = branches === null || branches === void 0 ? void 0 : branches.branches) === null || _b === void 0 ? void 0 : _b.filter((b) => b.name !== "main" && b.name !== "master")) === null || _c === void 0 ? void 0 : _c.map((b) => ({
                     title: b.name,
                     value: b.id,
                 }));
-                // const selection = await new Promise<{value: string, selected: boolean}[]>(
-                //   (res) => prompt("Neon.tech branches limit exceeded. Should we delete unused branches?", 
-                //   options
-                // ).on('submit', (items) => res(items)));
-                // const prompt = new MultiSelect({
-                //   name: 'value',
-                //   message: "Neon.tech branches limit exceeded. Should we delete unused branches?",
-                //   limit: 10,
-                //   choices: options
-                // });
-                // const inquirer = await import("inquirer");
-                // const prompt = inquirer.createPromptModule();
-                // const selection = await prompt([{
-                //   "type": "checkbox",
-                //   "choices": options
-                // }])
                 console.warn("Neon.tech branches limit exceeded.");
-                const selection = await (0, prompts_1.default)([{
-                        type: 'multiselect',
-                        name: 'value',
-                        message: 'Should we delete unused branches',
+                const selection = await (0, prompts_1.default)([
+                    {
+                        type: "multiselect",
+                        name: "value",
+                        message: "Should we delete unused branches",
                         choices: choices,
                         max: 10,
-                        hint: '- Space to select. Return to submit'
-                    }]);
+                        hint: "- Space to select. Return to submit",
+                    },
+                ]);
                 for (const branchId of selection === null || selection === void 0 ? void 0 : selection.value) {
                     try {
                         await neonClient.branch.deleteProjectBranch(project.id, branchId);
@@ -109,13 +105,14 @@ exports.default = async ({ strapi }) => {
         await new Promise((res) => setTimeout(res, 4500)); // sleep few sec till new endpoint is started
         dbConnectionUri = (_d = (_c = branch === null || branch === void 0 ? void 0 : branch.connection_uris) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.connection_uri;
         if (!dbConnectionUri) {
-            throw new Error("Returned without connection Uri. Res:" + JSON.stringify(branch, undefined, 2));
+            throw new Error("Returned without connection Uri. Res:" +
+                JSON.stringify(branch, undefined, 2));
         }
     }
     // branch already existed. Manually fetch connection uri
     if (!dbConnectionUri) {
-        const endpoint = await neonClient.branch.listProjectBranchEndpoints(project.id, branch.id);
-        const pw = await neonClient.branch.getProjectBranchRolePassword(project.id, branch.id, config.neonRole);
+        const endpoint = (await neonClient.branch.listProjectBranchEndpoints(project.id, branch.id));
+        const pw = (await neonClient.branch.getProjectBranchRolePassword(project.id, branch.id, config.neonRole));
         const ep = (_e = endpoint === null || endpoint === void 0 ? void 0 : endpoint.endpoints) === null || _e === void 0 ? void 0 : _e[0];
         const password = pw === null || pw === void 0 ? void 0 : pw.password;
         if (!ep) {
@@ -127,7 +124,7 @@ exports.default = async ({ strapi }) => {
         dbConnectionUri = `postgres://${config.neonRole}:${password}@${ep.host}/neondb`;
     }
     const dbConnection = (0, pg_connection_string_1.parse)(dbConnectionUri);
-    const currConf = strapi.config.get('database');
+    const currConf = strapi.config.get("database");
     const newConf = {
         connectionString: dbConnectionUri || (currConf === null || currConf === void 0 ? void 0 : currConf.connectionString),
         host: (dbConnection === null || dbConnection === void 0 ? void 0 : dbConnection.host) || (currConf === null || currConf === void 0 ? void 0 : currConf.host),
@@ -136,11 +133,15 @@ exports.default = async ({ strapi }) => {
         user: (dbConnection === null || dbConnection === void 0 ? void 0 : dbConnection.user) || (currConf === null || currConf === void 0 ? void 0 : currConf.user),
         password: (dbConnection === null || dbConnection === void 0 ? void 0 : dbConnection.password) || (currConf === null || currConf === void 0 ? void 0 : currConf.password),
         ssl: (_f = currConf === null || currConf === void 0 ? void 0 : currConf.ssl) !== null && _f !== void 0 ? _f : {
-            rejectUnauthorized: true
+            rejectUnauthorized: true,
         },
-        schema: (_g = currConf === null || currConf === void 0 ? void 0 : currConf.schema) !== null && _g !== void 0 ? _g : 'public',
+        schema: (_g = currConf === null || currConf === void 0 ? void 0 : currConf.schema) !== null && _g !== void 0 ? _g : "public",
     };
-    strapi.config.set('database.connection.connection', newConf);
-    strapi.config.set('database.connection.client', 'postgres');
+    strapi.config.set("database.connection.connection", newConf);
+    strapi.config.set("database.connection.client", "postgres");
     console.log(`Connecting to DB ${newConf.host} (branch ${gitBranchName}) with user ${newConf.user}`);
+}
+exports.default = async ({ strapi }) => {
+    initStrapi = strapi;
+    await createAndSetPostgresConfig();
 };
