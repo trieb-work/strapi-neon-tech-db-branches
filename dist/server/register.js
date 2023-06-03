@@ -3,6 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+if (!Headers) {
+    const { Headers } = require("node-fetch");
+    global.Headers = Headers;
+}
 const neon_sdk_1 = require("neon-sdk");
 const git_branch_1 = __importDefault(require("git-branch"));
 const pg_connection_string_1 = require("pg-connection-string");

@@ -1,3 +1,7 @@
+if (!Headers) {
+  const { Headers } = require("node-fetch");
+  global.Headers = Headers;
+}
 import { Strapi } from "@strapi/strapi";
 import {
   BranchCreateRequest,
