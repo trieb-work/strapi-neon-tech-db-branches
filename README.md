@@ -34,7 +34,7 @@ This plugin can be configured via Environment variables or via plugins.js config
 - `NEON_ROLE` create it manually under roles for your project first
 - `GIT_BRANCH || GITHUB_REF_NAME || VERCEL_GIT_COMMIT_REF` The branch can be pinned via one of these env variables (will use first available). If set, plugin will not use branch from git then. Usefull for deployment or in CI
 
-#### Configure via plugin.js config:
+#### Configure via config/plugin.js config:
 
 ```js
 module.exports = {
