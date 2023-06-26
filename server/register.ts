@@ -171,8 +171,10 @@ async function createAndSetPostgresConfig() {
     database: dbConnection?.database || currConf?.database,
     user: dbConnection?.user || currConf?.user,
     password: dbConnection?.password || currConf?.password,
-    ssl: currConf?.ssl ?? {
+    ssl: {
+      require: true,
       rejectUnauthorized: true,
+      ...currConf?.ssl,
     },
     schema: currConf?.schema ?? "public",
   };
