@@ -27,7 +27,7 @@ async function checkBranchChange() {
 }
 checkBranchChange();
 async function createAndSetPostgresConfig() {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f;
     const config = strapi.config.get("plugin.strapi-neon-tech-db-branches");
     if (config.gitBranch) {
         console.warn(`Using fixed branch ${config.gitBranch} for neon DB`);
@@ -132,10 +132,12 @@ async function createAndSetPostgresConfig() {
         database: (dbConnection === null || dbConnection === void 0 ? void 0 : dbConnection.database) || (currConf === null || currConf === void 0 ? void 0 : currConf.database),
         user: (dbConnection === null || dbConnection === void 0 ? void 0 : dbConnection.user) || (currConf === null || currConf === void 0 ? void 0 : currConf.user),
         password: (dbConnection === null || dbConnection === void 0 ? void 0 : dbConnection.password) || (currConf === null || currConf === void 0 ? void 0 : currConf.password),
-        ssl: (_f = currConf === null || currConf === void 0 ? void 0 : currConf.ssl) !== null && _f !== void 0 ? _f : {
+        ssl: {
+            require: true,
             rejectUnauthorized: true,
+            ...currConf === null || currConf === void 0 ? void 0 : currConf.ssl,
         },
-        schema: (_g = currConf === null || currConf === void 0 ? void 0 : currConf.schema) !== null && _g !== void 0 ? _g : "public",
+        schema: (_f = currConf === null || currConf === void 0 ? void 0 : currConf.schema) !== null && _f !== void 0 ? _f : "public",
     };
     strapi.config.set("database.connection.connection", newConf);
     strapi.config.set("database.connection.client", "postgres");
