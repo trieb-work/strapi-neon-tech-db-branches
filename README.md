@@ -58,6 +58,8 @@ module.exports = {
 
 For a production/preview deployment you generally do not want to deploy your whole git repo but instead build and bundle your application. Make sure to start the bundled application with environment variable `GIT_BRANCH` set. Best Option is to add this env variable in your CI Pipeline to the preview deployment. In Github Actions the git branch name is available during the CI run with `${{ github.ref_name }}` .
 
+If you have any API liveness probes/checks for your containers, make sure to use a route wich does not trigger DB usage. Otherwise your neon endpoints will run even on inactivity. DB get's triggered for example on `/index.html` so better use something from the static folder like `/assets/images/logo_login.png/assets/images/logo_login.png`
+
 ## Sponsors
 
 [Strapi Plugin developed and maintained by trieb.work cloud consulting](https://trieb.work/)
