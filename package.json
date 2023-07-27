@@ -1,6 +1,6 @@
 {
   "name": "strapi-neon-tech-db-branches",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "This Strapi Plugin integrates neon.tech serverless Postgres DB - including automatic DB branch creation (synced with git branch)",
   "strapi": {
     "name": "strapi-neon-tech-db-branches",
@@ -50,5 +50,8 @@
     "dev": "tsc -p tsconfig.server.json -w",
     "build": "rm -rf build && tsc -p tsconfig.server.json"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "resolutions": {
+    "findup-sync": "^4.0.0"
+  }
 }
