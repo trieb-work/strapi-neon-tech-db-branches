@@ -70,7 +70,7 @@ async function createAndSetPostgresConfig() {
       (b: any) => b.name?.trim() === gitBranchName?.trim()
     );
   }
-  let dbConnectionUri: string = "";
+  let dbConnectionUri: string | null = "";
   if (!branch) {
     const createBranchConf: BranchCreateRequest = {
       branch: {
@@ -132,13 +132,23 @@ async function createAndSetPostgresConfig() {
     console.log(
       `Successfully created new neon.tech DB branch ${gitBranchName}`
     );
-    await new Promise((res) => setTimeout(res, 4_500)); // sleep few sec till new endpoint is started
-    dbConnectionUri = branch?.connection_uris?.[0]?.connection_uri;
+    // await new Promise((res) => setTimeout(res, 4_500)); // sleep few sec till new endpoint is started
+    // dbConnectionUri = branch?.connection_uris?.[0]?.connection_uri;
+    // if (!dbConnectionUri) {
+    //   throw new Error(
+    //     "Returned without connection Uri. Res:" +
+    //       JSON.stringify(branch, undefined, 2)
+    //   );
+    // }
+    dbConnectionUri = await waitForConnectionUri(
+      neonClient,
+      project.id,
+      branch.id,
+      5
+    ); // Retry up to 5 times
+
     if (!dbConnectionUri) {
-      throw new Error(
-        "Returned without connection Uri. Res:" +
-          JSON.stringify(branch, undefined, 2)
-      );
+      throw new Error("Could not fetch connection URI after retries.");
     }
   }
   // branch already existed. Manually fetch connection uri
@@ -183,6 +193,40 @@ async function createAndSetPostgresConfig() {
   console.log(
     `Connecting to DB ${newConf.host} (branch ${gitBranchName}) with user ${newConf.user}`
   );
+}
+
+// Helper function to retry fetching connection URI with exponential backoff
+async function waitForConnectionUri(
+  neonClient: NeonClient,
+  projectId: string,
+  branchId: string,
+  maxRetries: number = 5,
+  delay: number = 2000
+): Promise<string | null> {
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      const branch = await neonClient.branch.getProjectBranch(
+        projectId,
+        branchId
+      );
+      const connectionUri = branch?.connection_uris?.[0]?.connection_uri;
+
+      if (connectionUri) {
+        return connectionUri;
+      }
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed: ${error.message}`);
+    }
+
+    // Exponential backoff delay
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    delay *= 2;
+    attempt++;
+  }
+
+  return null; // Return null if max retries are exceeded
 }
 
 export default async ({ strapi }: { strapi: Strapi }) => {
