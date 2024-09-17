@@ -27,7 +27,7 @@ async function checkBranchChange() {
 }
 checkBranchChange();
 async function createAndSetPostgresConfig() {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c;
     const config = strapi.config.get("plugin.strapi-neon-tech-db-branches");
     if (config.gitBranch) {
         console.warn(`Using fixed branch ${config.gitBranch} for neon DB`);
@@ -65,7 +65,7 @@ async function createAndSetPostgresConfig() {
                 },
             ],
         };
-        branch = await neonClient.branch
+        const newBranch = await neonClient.branch
             .createProjectBranch(project.id, createBranchConf)
             .catch(async (err) => {
             var _a, _b, _c;
@@ -98,30 +98,25 @@ async function createAndSetPostgresConfig() {
                 return neonClient.branch.createProjectBranch(project.id, createBranchConf);
             }
         });
-        if (!branch) {
+        if (!newBranch) {
             throw new Error("Could not create branch");
         }
+        if ("code" in newBranch)
+            throw new Error("Could not create branch:" + newBranch.message);
         console.log(`Successfully created new neon.tech DB branch ${gitBranchName}`);
-        await new Promise((res) => setTimeout(res, 4500)); // sleep few sec till new endpoint is started
-        dbConnectionUri = (_d = (_c = branch === null || branch === void 0 ? void 0 : branch.connection_uris) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.connection_uri;
+        dbConnectionUri = await getConnectionUriManually(neonClient, project.id, newBranch.branch.id, config);
+        console.log(`dbConnectionUri@newBranch:` + dbConnectionUri);
         if (!dbConnectionUri) {
-            throw new Error("Returned without connection Uri. Res:" +
-                JSON.stringify(branch, undefined, 2));
+            throw new Error("Could not fetch connection URI manually.");
         }
     }
     // branch already existed. Manually fetch connection uri
     if (!dbConnectionUri) {
-        const endpoint = (await neonClient.branch.listProjectBranchEndpoints(project.id, branch.id));
-        const pw = (await neonClient.branch.getProjectBranchRolePassword(project.id, branch.id, config.neonRole));
-        const ep = (_e = endpoint === null || endpoint === void 0 ? void 0 : endpoint.endpoints) === null || _e === void 0 ? void 0 : _e[0];
-        const password = pw === null || pw === void 0 ? void 0 : pw.password;
-        if (!ep) {
-            throw new Error("Could not fetch endpoint");
-        }
-        if (!password) {
-            throw new Error("Could not fetch password");
-        }
-        dbConnectionUri = `postgres://${config.neonRole}:${password}@${ep.host}/neondb`;
+        dbConnectionUri = await getConnectionUriManually(neonClient, project.id, branch.id, config);
+        console.log(`dbConnectionUri@existingBranch:` + dbConnectionUri);
+    }
+    if (!dbConnectionUri) {
+        throw new Error("Could not fetch connection URI manually.");
     }
     const dbConnection = (0, pg_connection_string_1.parse)(dbConnectionUri);
     const currConf = strapi.config.get("database");
@@ -137,11 +132,42 @@ async function createAndSetPostgresConfig() {
             rejectUnauthorized: true,
             ...currConf === null || currConf === void 0 ? void 0 : currConf.ssl,
         },
-        schema: (_f = currConf === null || currConf === void 0 ? void 0 : currConf.schema) !== null && _f !== void 0 ? _f : "public",
+        schema: (_c = currConf === null || currConf === void 0 ? void 0 : currConf.schema) !== null && _c !== void 0 ? _c : "public",
     };
     strapi.config.set("database.connection.connection", newConf);
     strapi.config.set("database.connection.client", "postgres");
     console.log(`Connecting to DB ${newConf.host} (branch ${gitBranchName}) with user ${newConf.user}`);
+}
+async function createNewBranch() { }
+async function getConnectionUriManually(neonClient, projectId, branchId, config, maxRetries = 5, delay = 2000) {
+    var _a;
+    console.log("@getConnectionUriManually");
+    let attempt = 0;
+    while (attempt < maxRetries) {
+        try {
+            const endpoint = (await neonClient.branch.listProjectBranchEndpoints(projectId, branchId));
+            const pw = (await neonClient.branch.getProjectBranchRolePassword(projectId, branchId, config.neonRole));
+            const ep = (_a = endpoint === null || endpoint === void 0 ? void 0 : endpoint.endpoints) === null || _a === void 0 ? void 0 : _a[0];
+            const password = pw === null || pw === void 0 ? void 0 : pw.password;
+            if (!ep) {
+                console.error("Could not fetch endpoint");
+                throw new Error("Could not fetch endpoint");
+            }
+            if (!password) {
+                console.error("Could not fetch password");
+                throw new Error("Could not fetch password");
+            }
+            return `postgres://${config.neonRole}:${password}@${ep.host}/neondb`;
+        }
+        catch (error) {
+            console.error(`Attempt ${attempt + 1} failed: ${error.message}`);
+        }
+        // Exponential backoff delay
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay *= 2;
+        attempt++;
+    }
+    return null;
 }
 exports.default = async ({ strapi }) => {
     initStrapi = strapi;
