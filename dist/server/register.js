@@ -48,7 +48,9 @@ async function createAndSetPostgresConfig() {
     if (!project) {
         throw new Error(`No Project found with this Name ${config.neonProjectName}`);
     }
-    const branches = (await neonClient.branch.listProjectBranches(project.id));
+    const branches = await neonClient.branch.listProjectBranches(project.id);
+    if ("code" in branches)
+        throw new Error("Could not fetch all branches:" + branches.message);
     let branch;
     if (branches === null || branches === void 0 ? void 0 : branches.branches) {
         branch = (_b = branches === null || branches === void 0 ? void 0 : branches.branches) === null || _b === void 0 ? void 0 : _b.find((b) => { var _a; return ((_a = b.name) === null || _a === void 0 ? void 0 : _a.trim()) === (gitBranchName === null || gitBranchName === void 0 ? void 0 : gitBranchName.trim()); });
@@ -65,6 +67,7 @@ async function createAndSetPostgresConfig() {
                 },
             ],
         };
+        console.log("Creating a new branch...: " + gitBranchName);
         const newBranch = await neonClient.branch
             .createProjectBranch(project.id, createBranchConf)
             .catch(async (err) => {
@@ -89,7 +92,7 @@ async function createAndSetPostgresConfig() {
                     try {
                         await neonClient.branch.deleteProjectBranch(project.id, branchId);
                         await new Promise((res) => setTimeout(res, 2500)); // sleep few till branch delete operation is finished
-                        console.log("branch", branchId, "deleted");
+                        console.log("branch with id ", branchId, "deleted");
                     }
                     catch (err) {
                         console.log("something went wrong deleting branch ", branchId, ": ", err.body.message);
@@ -105,7 +108,6 @@ async function createAndSetPostgresConfig() {
             throw new Error("Could not create branch:" + newBranch.message);
         console.log(`Successfully created new neon.tech DB branch ${gitBranchName}`);
         dbConnectionUri = await getConnectionUriManually(neonClient, project.id, newBranch.branch.id, config);
-        console.log(`dbConnectionUri@newBranch:` + dbConnectionUri);
         if (!dbConnectionUri) {
             throw new Error("Could not fetch connection URI manually.");
         }
@@ -113,7 +115,7 @@ async function createAndSetPostgresConfig() {
     // branch already existed. Manually fetch connection uri
     if (!dbConnectionUri) {
         dbConnectionUri = await getConnectionUriManually(neonClient, project.id, branch.id, config);
-        console.log(`dbConnectionUri@existingBranch:` + dbConnectionUri);
+        // console.log(`dbConnectionUri@existingBranch:` + dbConnectionUri);
     }
     if (!dbConnectionUri) {
         throw new Error("Could not fetch connection URI manually.");
@@ -138,10 +140,9 @@ async function createAndSetPostgresConfig() {
     strapi.config.set("database.connection.client", "postgres");
     console.log(`Connecting to DB ${newConf.host} (branch ${gitBranchName}) with user ${newConf.user}`);
 }
-async function createNewBranch() { }
 async function getConnectionUriManually(neonClient, projectId, branchId, config, maxRetries = 5, delay = 2000) {
     var _a;
-    console.log("@getConnectionUriManually");
+    // console.log("@getConnectionUriManually");
     let attempt = 0;
     while (attempt < maxRetries) {
         try {

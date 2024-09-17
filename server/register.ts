@@ -1,8 +1,11 @@
 import { Strapi } from "@strapi/strapi";
 import {
+  Branch,
   BranchCreateRequest,
   BranchesResponse,
+  BranchResponse,
   EndpointsResponse,
+  GeneralError,
   NeonClient,
   ProjectListItem,
   ProjectsResponse,
@@ -62,15 +65,18 @@ async function createAndSetPostgresConfig() {
       `No Project found with this Name ${config.neonProjectName}`
     );
   }
-  const branches = (await neonClient.branch.listProjectBranches(
-    project.id
-  )) as BranchesResponse;
-  let branch;
+  const branches: BranchesResponse | GeneralError =
+    await neonClient.branch.listProjectBranches(project.id);
+  if ("code" in branches)
+    throw new Error("Could not fetch all branches:" + branches.message);
+
+  let branch: Branch | undefined;
   if (branches?.branches) {
     branch = branches?.branches?.find(
       (b: any) => b.name?.trim() === gitBranchName?.trim()
     );
   }
+
   let dbConnectionUri: string | null = "";
   if (!branch) {
     const createBranchConf: BranchCreateRequest = {
@@ -83,50 +89,56 @@ async function createAndSetPostgresConfig() {
         },
       ],
     };
-    const newBranch = await neonClient.branch
-      .createProjectBranch(project.id, createBranchConf)
-      .catch(async (err) => {
-        if (err?.body?.code === "BRANCHES_LIMIT_EXCEEDED") {
-          const choices = branches?.branches
-            ?.filter((b) => b.name !== "main" && b.name !== "master")
-            ?.map((b) => ({
-              title: b.name,
-              value: b.id,
-            }));
 
-          console.warn("Neon.tech branches limit exceeded.");
+    console.log("Creating a new branch...: " + gitBranchName);
+    const newBranch: BranchResponse | GeneralError | undefined =
+      await neonClient.branch
+        .createProjectBranch(project.id, createBranchConf)
+        .catch(async (err) => {
+          if (err?.body?.code === "BRANCHES_LIMIT_EXCEEDED") {
+            const choices = branches?.branches
+              ?.filter((b) => b.name !== "main" && b.name !== "master")
+              ?.map((b) => ({
+                title: b.name,
+                value: b.id,
+              }));
 
-          const selection = await prompts([
-            {
-              type: "multiselect",
-              name: "value",
-              message: "Should we delete unused branches",
-              choices: choices,
-              max: 10,
-              hint: "- Space to select. Return to submit",
-            },
-          ]);
+            console.warn("Neon.tech branches limit exceeded.");
 
-          for (const branchId of selection?.value) {
-            try {
-              await neonClient.branch.deleteProjectBranch(project.id, branchId);
-              await new Promise((res) => setTimeout(res, 2_500)); // sleep few till branch delete operation is finished
-              console.log("branch", branchId, "deleted");
-            } catch (err) {
-              console.log(
-                "something went wrong deleting branch ",
-                branchId,
-                ": ",
-                err.body.message
-              );
+            const selection = await prompts([
+              {
+                type: "multiselect",
+                name: "value",
+                message: "Should we delete unused branches",
+                choices: choices,
+                max: 10,
+                hint: "- Space to select. Return to submit",
+              },
+            ]);
+
+            for (const branchId of selection?.value) {
+              try {
+                await neonClient.branch.deleteProjectBranch(
+                  project.id,
+                  branchId
+                );
+                await new Promise((res) => setTimeout(res, 2_500)); // sleep few till branch delete operation is finished
+                console.log("branch with id ", branchId, "deleted");
+              } catch (err) {
+                console.log(
+                  "something went wrong deleting branch ",
+                  branchId,
+                  ": ",
+                  err.body.message
+                );
+              }
             }
+            return neonClient.branch.createProjectBranch(
+              project.id,
+              createBranchConf
+            );
           }
-          return neonClient.branch.createProjectBranch(
-            project.id,
-            createBranchConf
-          );
-        }
-      });
+        });
     if (!newBranch) {
       throw new Error("Could not create branch");
     }
@@ -144,21 +156,22 @@ async function createAndSetPostgresConfig() {
       newBranch.branch.id,
       config
     );
-    console.log(`dbConnectionUri@newBranch:` + dbConnectionUri);
 
     if (!dbConnectionUri) {
       throw new Error("Could not fetch connection URI manually.");
     }
   }
+
+
   // branch already existed. Manually fetch connection uri
   if (!dbConnectionUri) {
     dbConnectionUri = await getConnectionUriManually(
       neonClient,
       project.id,
-      branch.id,
+      branch!.id,
       config
     );
-    console.log(`dbConnectionUri@existingBranch:` + dbConnectionUri);
+    // console.log(`dbConnectionUri@existingBranch:` + dbConnectionUri);
   }
 
   if (!dbConnectionUri) {
@@ -196,7 +209,7 @@ async function getConnectionUriManually(
   maxRetries: number = 5,
   delay: number = 2000
 ): Promise<string | null> {
-  console.log("@getConnectionUriManually");
+  // console.log("@getConnectionUriManually");
   let attempt = 0;
 
   while (attempt < maxRetries) {
