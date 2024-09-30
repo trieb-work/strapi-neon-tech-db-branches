@@ -1,9 +1,13 @@
 import { Strapi } from "@strapi/strapi";
 import {
+  Branch,
   BranchCreateRequest,
   BranchesResponse,
+  BranchResponse,
   EndpointsResponse,
+  GeneralError,
   NeonClient,
+  ProjectListItem,
   ProjectsResponse,
   RolePasswordResponse,
 } from "neon-sdk";
@@ -50,7 +54,7 @@ async function createAndSetPostgresConfig() {
   });
   const projects =
     (await neonClient.project.listProjects()) as ProjectsResponse;
-  let project;
+  let project: ProjectListItem | undefined;
   if (projects?.projects) {
     project = projects?.projects?.find(
       (p: any) => p.name?.trim() === config.neonProjectName?.trim()
@@ -61,16 +65,19 @@ async function createAndSetPostgresConfig() {
       `No Project found with this Name ${config.neonProjectName}`
     );
   }
-  const branches = (await neonClient.branch.listProjectBranches(
-    project.id
-  )) as BranchesResponse;
-  let branch;
+  const branches: BranchesResponse | GeneralError =
+    await neonClient.branch.listProjectBranches(project.id);
+  if ("code" in branches)
+    throw new Error("Could not fetch all branches:" + branches.message);
+
+  let branch: Branch | undefined;
   if (branches?.branches) {
     branch = branches?.branches?.find(
       (b: any) => b.name?.trim() === gitBranchName?.trim()
     );
   }
-  let dbConnectionUri: string = "";
+
+  let dbConnectionUri: string | null = "";
   if (!branch) {
     const createBranchConf: BranchCreateRequest = {
       branch: {
@@ -82,86 +89,95 @@ async function createAndSetPostgresConfig() {
         },
       ],
     };
-    branch = await neonClient.branch
-      .createProjectBranch(project.id, createBranchConf)
-      .catch(async (err) => {
-        if (err?.body?.code === "BRANCHES_LIMIT_EXCEEDED") {
-          const choices = branches?.branches
-            ?.filter((b) => b.name !== "main" && b.name !== "master")
-            ?.map((b) => ({
-              title: b.name,
-              value: b.id,
-            }));
 
-          console.warn("Neon.tech branches limit exceeded.");
+    console.log("Creating a new branch...: " + gitBranchName);
+    const newBranch: BranchResponse | GeneralError | undefined =
+      await neonClient.branch
+        .createProjectBranch(project.id, createBranchConf)
+        .catch(async (err) => {
+          if (err?.body?.code === "BRANCHES_LIMIT_EXCEEDED") {
+            const choices = branches?.branches
+              ?.filter((b) => b.name !== "main" && b.name !== "master")
+              ?.map((b) => ({
+                title: b.name,
+                value: b.id,
+              }));
 
-          const selection = await prompts([
-            {
-              type: "multiselect",
-              name: "value",
-              message: "Should we delete unused branches",
-              choices: choices,
-              max: 10,
-              hint: "- Space to select. Return to submit",
-            },
-          ]);
+            console.warn("Neon.tech branches limit exceeded.");
 
-          for (const branchId of selection?.value) {
-            try {
-              await neonClient.branch.deleteProjectBranch(project.id, branchId);
-              await new Promise((res) => setTimeout(res, 2_500)); // sleep few till branch delete operation is finished
-              console.log("branch", branchId, "deleted");
-            } catch (err) {
-              console.log(
-                "something went wrong deleting branch ",
-                branchId,
-                ": ",
-                err.body.message
-              );
+            const selection = await prompts([
+              {
+                type: "multiselect",
+                name: "value",
+                message: "Should we delete unused branches",
+                choices: choices,
+                max: 10,
+                hint: "- Space to select. Return to submit",
+              },
+            ]);
+
+            for (const branchId of selection?.value) {
+              try {
+                await neonClient.branch.deleteProjectBranch(
+                  project.id,
+                  branchId
+                );
+                await new Promise((res) => setTimeout(res, 2_500)); // sleep few till branch delete operation is finished
+                console.log("branch with id ", branchId, "deleted");
+              } catch (err) {
+                console.log(
+                  "something went wrong deleting branch ",
+                  branchId,
+                  ": ",
+                  err.body.message
+                );
+              }
             }
+            return neonClient.branch.createProjectBranch(
+              project.id,
+              createBranchConf
+            );
           }
-          return neonClient.branch.createProjectBranch(
-            project.id,
-            createBranchConf
-          );
-        }
-      });
-    if (!branch) {
+        });
+    if (!newBranch) {
       throw new Error("Could not create branch");
     }
+
+    if ("code" in newBranch)
+      throw new Error("Could not create branch:" + newBranch.message);
+
     console.log(
       `Successfully created new neon.tech DB branch ${gitBranchName}`
     );
-    await new Promise((res) => setTimeout(res, 4_500)); // sleep few sec till new endpoint is started
-    dbConnectionUri = branch?.connection_uris?.[0]?.connection_uri;
+
+    dbConnectionUri = await getConnectionUriManually(
+      neonClient,
+      project.id,
+      newBranch.branch.id,
+      config
+    );
+
     if (!dbConnectionUri) {
-      throw new Error(
-        "Returned without connection Uri. Res:" +
-          JSON.stringify(branch, undefined, 2)
-      );
+      throw new Error("Could not fetch connection URI manually.");
     }
   }
+
+
   // branch already existed. Manually fetch connection uri
   if (!dbConnectionUri) {
-    const endpoint = (await neonClient.branch.listProjectBranchEndpoints(
+    dbConnectionUri = await getConnectionUriManually(
+      neonClient,
       project.id,
-      branch.id
-    )) as EndpointsResponse;
-    const pw = (await neonClient.branch.getProjectBranchRolePassword(
-      project.id,
-      branch.id,
-      config.neonRole
-    )) as RolePasswordResponse;
-    const ep = endpoint?.endpoints?.[0];
-    const password = pw?.password;
-    if (!ep) {
-      throw new Error("Could not fetch endpoint");
-    }
-    if (!password) {
-      throw new Error("Could not fetch password");
-    }
-    dbConnectionUri = `postgres://${config.neonRole}:${password}@${ep.host}/neondb`;
+      branch!.id,
+      config
+    );
+    // console.log(`dbConnectionUri@existingBranch:` + dbConnectionUri);
   }
+
+  if (!dbConnectionUri) {
+    throw new Error("Could not fetch connection URI manually.");
+  }
+
   const dbConnection = parse(dbConnectionUri);
   const currConf = strapi.config.get("database");
   const newConf = {
@@ -183,6 +199,51 @@ async function createAndSetPostgresConfig() {
   console.log(
     `Connecting to DB ${newConf.host} (branch ${gitBranchName}) with user ${newConf.user}`
   );
+}
+
+async function getConnectionUriManually(
+  neonClient: NeonClient,
+  projectId: string,
+  branchId: string,
+  config: NeonTechDburlConfig,
+  maxRetries: number = 5,
+  delay: number = 2000
+): Promise<string | null> {
+  // console.log("@getConnectionUriManually");
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      const endpoint = (await neonClient.branch.listProjectBranchEndpoints(
+        projectId,
+        branchId
+      )) as EndpointsResponse;
+      const pw = (await neonClient.branch.getProjectBranchRolePassword(
+        projectId,
+        branchId,
+        config.neonRole
+      )) as RolePasswordResponse;
+      const ep = endpoint?.endpoints?.[0];
+      const password = pw?.password;
+      if (!ep) {
+        console.error("Could not fetch endpoint");
+        throw new Error("Could not fetch endpoint");
+      }
+      if (!password) {
+        console.error("Could not fetch password");
+        throw new Error("Could not fetch password");
+      }
+      return `postgres://${config.neonRole}:${password}@${ep.host}/neondb`;
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed: ${error.message}`);
+    }
+
+    // Exponential backoff delay
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    delay *= 2;
+    attempt++;
+  }
+  return null;
 }
 
 export default async ({ strapi }: { strapi: Strapi }) => {
