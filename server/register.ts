@@ -1,4 +1,4 @@
-import { Strapi } from "@strapi/strapi";
+import type { Core } from "@strapi/strapi";
 import {
   BranchCreateRequest,
   BranchesResponse,
@@ -13,7 +13,7 @@ import { parse } from "pg-connection-string";
 import prompts from "prompts";
 
 let initBranch = "";
-let initStrapi: Strapi | undefined = undefined;
+let initStrapi: Core.Strapi | undefined = undefined;
 
 async function checkBranchChange() {
   if (initBranch === "") {
@@ -160,32 +160,23 @@ async function createAndSetPostgresConfig() {
     if (!password) {
       throw new Error("Could not fetch password");
     }
-    dbConnectionUri = `postgres://${config.neonRole}:${password}@${ep.host}/neondb`;
+    dbConnectionUri = `postgres://${config.neonRole}:${password}@${ep.host}/neondb?sslmode=require`;
   }
   const dbConnection = parse(dbConnectionUri);
-  const currConf = strapi.config.get("database");
+
+  const currDatabaseConf = strapi.config.get("database.connection.connection") as any;
+  
   const newConf = {
-    connectionString: dbConnectionUri || currConf?.connectionString,
-    host: dbConnection?.host || currConf?.host,
-    port: dbConnection?.port || currConf?.port,
-    database: dbConnection?.database || currConf?.database,
-    user: dbConnection?.user || currConf?.user,
-    password: dbConnection?.password || currConf?.password,
-    ssl: {
-      require: true,
-      rejectUnauthorized: true,
-      ...currConf?.ssl,
-    },
-    schema: currConf?.schema ?? "public",
+    connectionString: dbConnectionUri || currDatabaseConf?.connectionString,
   };
-  strapi.config.set("database.connection.connection", newConf);
+  strapi.config.set("database.connection", { connection: newConf });
   strapi.config.set("database.connection.client", "postgres");
-  console.log(
-    `Connecting to DB ${newConf.host} (branch ${gitBranchName}) with user ${newConf.user}`
+  strapi.log.info(
+    `Connecting to DB ${dbConnection.host} (branch ${gitBranchName}) with user ${dbConnection.user}`
   );
 }
 
-export default async ({ strapi }: { strapi: Strapi }) => {
+export default async ({ strapi }: { strapi: Core.Strapi }) => {
   initStrapi = strapi;
-  await createAndSetPostgresConfig();
+  return createAndSetPostgresConfig();
 };
